@@ -272,6 +272,27 @@ public abstract class Sys{
 		return Math.round(System.currentTimeMillis() * (1 - (2*RANDOM.nextDouble())));
 	}
 	
+	public static int amean(int...nums){
+		int mean = 0;
+		for(int n : nums) mean += n;
+		mean /= nums.length;
+		return mean;
+	}
+	
+	public static int gmean(int...nums){
+		int mean = 1;
+		for(int n : nums) mean *= n;
+		mean = (int)Math.round(Math.pow(mean, 1d / ((float)nums.length)));
+		return mean;
+	}
+	
+	public static int hmean(int...nums){
+		float mean = 0;
+		for(int n : nums) mean += (1d / (float)n);
+		mean = ((float)nums.length) / mean;
+		return Math.round(mean);
+	}
+	
 	public static double round(double d){
 		return Double.parseDouble(DECIMAL_FORMAT.format(d));
 	}

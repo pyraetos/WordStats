@@ -30,31 +30,34 @@ public class WordStats{
 	
 	//Utilized per document
 	private static Map<String, Set<Integer>> locations;
-	private static Map<String, Map<String, Integer>> minDistances = new HashMap<String, Map<String, Integer>>();
+	private static Map<String, Map<String, Integer>> strengths = new HashMap<String, Map<String, Integer>>();
 		//Map<Word, <All other words, current minimum distance>>
-	
 	
 	private static void updateMinDistances(){
 		for(String wordA : locations.keySet()){
-			if(!minDistances.containsKey(wordA))
-				minDistances.put(wordA, new HashMap<String, Integer>());
+			if(!strengths.containsKey(wordA))
+				strengths.put(wordA, new HashMap<String, Integer>());
 			
 			for(String wordB : locations.keySet()){
 				if(wordB.equals(wordA)) continue;
-				Map<String, Integer> wordAMap = minDistances.get(wordA);
+				Map<String, Integer> wordAMap = strengths.get(wordA);
 				if(!wordAMap.containsKey(wordB))
 					wordAMap.put(wordB, Integer.MAX_VALUE);
 				
 				//Use this space to compare all instance locations of the wordA with all instance locations of wordB
-				//SPEND SOME TIME THINKING ABOUT WAYS TO OPTIMIZE
-				//ADD MODE DISTANCE WEIGHTED BY PAPER LENGTH?? # of occurrences should factor into strengthOfAssociation
+				//Num of occurrences should factor into strengthOfAssociation
+				int soa = 0;
 				for(int absLocationA : locations.get(wordA)){
+					int partialStrength = Integer.MAX_VALUE;
 					for(int absLocationB : locations.get(wordB)){
 						int d = Math.abs(absLocationA - absLocationB);
-						if(d < wordAMap.get(wordB))
-							wordAMap.put(wordB, d);
+						if(d < partialStrength)
+							partialStrength = d;
 					}
+					soa += partialStrength;
 				}
+				soa /= locations.get(wordA).size();
+				wordAMap.put(wordB, soa);
 			}
 		}
 	}
@@ -96,9 +99,9 @@ public class WordStats{
 				updateHistoMap();
 				updateMinDistances();
 				
-				for(String a : minDistances.keySet()){
-					for(String b : minDistances.get(a).keySet()){
-						Sys.debug("MinDist(" + a + ", " + b + ") = " + minDistances.get(a).get(b));
+				for(String a : strengths.keySet()){
+					for(String b : strengths.get(a).keySet()){
+						Sys.debug("SOA(" + a + ", " + b + ") = " + strengths.get(a).get(b));
 					}
 				}
 				System.exit(0);
