@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -28,38 +29,84 @@ public class WordStats{
 	
 	private static BidiMap<String, String> nouns;
 	
+	static class SOA implements Comparable{
+
+		float soa;
+		String word;
+		
+		@Override
+		public int compareTo(Object o){
+			if(!(o instanceof SOA)) return 0;
+			SOA other = (SOA)o;
+			return soa < other.soa ? 1 : -1;
+		}
+		
+	}
+	
 	//Utilized per document
 	private static Map<String, Set<Integer>> locations;
-	private static Map<String, Map<String, Integer>> strengths = new HashMap<String, Map<String, Integer>>();
+	private static Map<String, Map<String, Float>> strengths = new HashMap<String, Map<String, Float>>();
+	private static Map<String, PriorityQueue<SOA>> strengthHeap = new HashMap<String, PriorityQueue<SOA>>();
 		//Map<Word, <All other words, current minimum distance>>
 	
-	private static void updateMinDistances(){
+	private static int maxROA = 0;
+	private static List<Integer> allRankings = new ArrayList<Integer>();
+	
+	private static void updateSOAs(){
 		for(String wordA : locations.keySet()){
 			if(!strengths.containsKey(wordA))
-				strengths.put(wordA, new HashMap<String, Integer>());
-			
+				strengths.put(wordA, new HashMap<String, Float>());
 			for(String wordB : locations.keySet()){
 				if(wordB.equals(wordA)) continue;
-				Map<String, Integer> wordAMap = strengths.get(wordA);
+				Map<String, Float> wordAMap = strengths.get(wordA);
 				if(!wordAMap.containsKey(wordB))
-					wordAMap.put(wordB, Integer.MAX_VALUE);
+					wordAMap.put(wordB, 0f);
 				
 				//Use this space to compare all instance locations of the wordA with all instance locations of wordB
-				//Num of occurrences should factor into strengthOfAssociation
-				int soa = 0;
-				for(int absLocationA : locations.get(wordA)){
-					int partialStrength = Integer.MAX_VALUE;
-					for(int absLocationB : locations.get(wordB)){
-						int d = Math.abs(absLocationA - absLocationB);
-						if(d < partialStrength)
-							partialStrength = d;
+				int ranking = 0;
+				for(int a_i : locations.get(wordA)){
+					int ranking_i = Integer.MAX_VALUE;
+					for(int b_j : locations.get(wordB)){
+						int d_ij = Math.abs(a_i - b_j);
+						if(d_ij < ranking_i) ranking_i = d_ij;
 					}
-					soa += partialStrength;
+					ranking += ranking_i; //Add mindist to cumulative mindist
 				}
-				soa /= locations.get(wordA).size();
-				wordAMap.put(wordB, soa);
+				ranking /= locations.get(wordA).size(); //Arithmetic mean of mindists to get ranking of association
+				allRankings.add(ranking);
+				
+				//Emplace temporary roa
+				if(ranking > maxROA) maxROA = ranking;
+				wordAMap.put(wordB, (float)ranking);
 			}
 		}
+		
+		//Convert all RoAs to SoA
+		float max = (float)maxROA;
+		for(String a : strengths.keySet()){
+			strengthHeap.put(a, new PriorityQueue<SOA>());
+			for(String b : strengths.get(a).keySet()){
+				float roa = strengths.get(a).get(b);
+				float strength = (float)Math.pow(4f, -((roa/max) * 6f));
+				strengths.get(a).put(b, strength);
+				SOA soa = new SOA();
+				soa.word = b;
+				soa.soa = strength;
+				strengthHeap.get(a).offer(soa);
+			}
+		}
+		
+		
+		//Graph the RoAs
+		/*int iii[] = new int[allRankings.size()];
+		long bigoleranking=0;
+		for(int i =0; i < allRankings.size(); i++) {
+			iii[i] = allRankings.get(i);
+			bigoleranking += (long)allRankings.get(i);
+		}
+		Sys.histogram(100, 30, iii);
+		Sys.debug(bigoleranking / ((long)allRankings.size()));
+		System.exit(1);*/
 	}
 	
 	public static void main(String[] args){
@@ -97,18 +144,36 @@ public class WordStats{
 				totalText += pdfts.getText(pdf);
 				pdf.close();
 				updateHistoMap();
-				updateMinDistances();
+				updateSOAs();
 				
-				for(String a : strengths.keySet()){
-					for(String b : strengths.get(a).keySet()){
-						Sys.debug("SOA(" + a + ", " + b + ") = " + strengths.get(a).get(b));
-					}
+				//for(String a : strengths.keySet()){
+				String a = "bird";
+				Sys.debug(strengths.get("bird").get("twig"));
+				while(!strengthHeap.get(a).isEmpty()){
+					SOA soa = strengthHeap.get(a).poll();
+					Sys.debug(a +" -> " + soa.word + ": " + soa.soa);
+					Sys.sleep(3000);
 				}
+				//}
 				System.exit(0);
 			}
 		}catch(Exception e){
 			e.printStackTrace();
+			System.exit(0);
 		}
+	}
+	
+	public static void wordGame(String word){
+		Set<String> used = new HashSet<String>();
+		for(int i = 0; i < 50; i++){
+			Sys.debug(word);
+			PriorityQueue<SOA> heap = strengthHeap.get(word);
+			used.add(word);
+			while(used.contains(word))
+				word = heap.poll().word;
+			Sys.sleep(1000);
+		}
+		
 	}
 	
 	public static void updateHistoMap(){
